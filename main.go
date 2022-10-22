@@ -20,22 +20,37 @@ func main() {
 	}
 }
 
-type workflowRunEvent struct {
+//type workflowRunEvent struct {
+//	Action string `json:"action"`
+//	WorkflowRun workflowRun `json:"workflow_run"`
+//}
+//
+//type workflowRun struct {
+//	CancelUrl string `json:"cancel_url"`
+//	Event string `json:"event"`
+//	CreatedAt string `json:"created_at"`
+//	RerunUrl string `json:"rerun_url"`
+//	Status string `json:"status"`
+//}
+
+type workflowJobEvent struct {
 	Action string `json:"action"`
-	WorkflowRun workflowRun `json:"workflow_run"`
+	WorkflowJob workflowJob `json:"workflow_job"`
 }
 
-type workflowRun struct {
-	CancelUrl string `json:"cancel_url"`
-	Event string `json:"event"`
-	CreatedAt string `json:"created_at"`
-	RerunUrl string `json:"rerun_url"`
-	Status string `json:"status"`
+type workflowJob struct {
+	RunUrl string `json:"run_url"`
+	Conclusion string `json:"conclusion"`
+	StartedAt string `json:"started_at"`
+	CompletedAt string `json:"completed_at"`
+	Labels []string `json:"labels"`
+	RunnerId int `json:"runner_id"`
+	RunnerName string `json:"runner_name"`
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Body)
-	var wr workflowRunEvent
+	var wr workflowJobEvent
 
 	err := json.NewDecoder(r.Body).Decode(&wr)
 	if err != nil {
