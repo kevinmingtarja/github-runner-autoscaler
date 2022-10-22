@@ -22,7 +22,7 @@ func main() {
 
 type workflowRunEvent struct {
 	Action string `json:"action"`
-	WorkflowRun workflowRun
+	WorkflowRun workflowRun `json:"workflow_run"`
 }
 
 type workflowRun struct {
