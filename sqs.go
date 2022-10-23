@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
 	"fmt"
@@ -12,9 +14,9 @@ import (
 )
 
 const (
-	SqsMaxWaitTimeSeconds = 20
+	SqsMaxWaitTimeSeconds  = 20
 	SqsMaxNumberOfMessaged = 10
-	MessageGroupId = "jobs-queue"
+	MessageGroupId         = "jobs-queue"
 )
 
 type sqsQueue struct {
@@ -55,7 +57,17 @@ func (q *sqsQueue) SendJob(ctx context.Context, job *queue.Job) (*queue.SendMess
 	if err != nil {
 		return nil, err
 	}
-	out, err := q.SendMessage(ctx, &sqs.SendMessageInput{MessageBody: aws.String(string(b)), QueueUrl: &q.url, DelaySeconds: 30, MessageGroupId: aws.String(MessageGroupId)})
+	hash := md5.Sum(b)
+	out, err := q.SendMessage(
+		ctx,
+		&sqs.SendMessageInput{
+			MessageBody: aws.String(string(b)),
+			QueueUrl: &q.url,
+			DelaySeconds: 30,
+			MessageGroupId: aws.String(MessageGroupId),
+			MessageDeduplicationId: aws.String(hex.EncodeToString(hash[:])),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

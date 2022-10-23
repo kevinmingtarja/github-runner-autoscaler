@@ -17,9 +17,10 @@ const (
 
 func main() {
 	if err := run(); err != nil {
-	fmt.Fprintf(os.Stderr, "%s\n", err)
-	os.Exit(1)
-}}
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
+}
 
 func run() error {
 	err := godotenv.Load(".env")
@@ -45,22 +46,20 @@ func run() error {
 	return http.ListenAndServe(":8080", srv)
 }
 
-
-
 type workflowJobEvent struct {
-	Action string `json:"action"`
+	Action      string      `json:"action"`
 	WorkflowJob workflowJob `json:"workflow_job"`
 }
 
 type workflowJob struct {
-	Id int `json:"id"`
-	RunUrl string `json:"run_url"`
-	Conclusion string `json:"conclusion"`
-	StartedAt string `json:"started_at"`
-	CompletedAt string `json:"completed_at"`
-	Labels []string `json:"labels"`
-	RunnerId int `json:"runner_id"`
-	RunnerName string `json:"runner_name"`
+	Id          int      `json:"id"`
+	RunUrl      string   `json:"run_url"`
+	Conclusion  string   `json:"conclusion"`
+	StartedAt   string   `json:"started_at"`
+	CompletedAt string   `json:"completed_at"`
+	Labels      []string `json:"labels"`
+	RunnerId    int      `json:"runner_id"`
+	RunnerName  string   `json:"runner_name"`
 }
 
 func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {

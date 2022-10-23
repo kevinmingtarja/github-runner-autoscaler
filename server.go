@@ -7,13 +7,13 @@ import (
 
 type server struct {
 	router *http.ServeMux
-	q queue.JobQueue
+	q      queue.JobQueue
 }
 
 func initServer(q queue.JobQueue) *server {
 	srv := &server{
 		router: http.DefaultServeMux,
-		q: q,
+		q:      q,
 	}
 	srv.routes()
 	return srv
