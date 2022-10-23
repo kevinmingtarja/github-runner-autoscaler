@@ -63,7 +63,6 @@ func (q *sqsQueue) SendJob(ctx context.Context, job *queue.Job) (*queue.SendMess
 		&sqs.SendMessageInput{
 			MessageBody: aws.String(string(b)),
 			QueueUrl: &q.url,
-			DelaySeconds: 30,
 			MessageGroupId: aws.String(MessageGroupId),
 			MessageDeduplicationId: aws.String(hex.EncodeToString(hash[:])),
 		},
