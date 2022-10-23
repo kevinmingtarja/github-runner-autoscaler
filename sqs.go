@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -13,6 +14,7 @@ import (
 const (
 	SqsMaxWaitTimeSeconds = 20
 	SqsMaxNumberOfMessaged = 10
+	MessageGroupId = "jobs-queue"
 )
 
 type sqsQueue struct {
@@ -42,6 +44,7 @@ func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
 		}
 
 		for _, message := range out.Messages {
+			fmt.Println("RECV", message.MessageId)
 			ch <- &queue.Message{Body: message.Body, MessageId: message.MessageId}
 		}
 	}
@@ -52,7 +55,7 @@ func (q *sqsQueue) SendJob(ctx context.Context, job *queue.Job) (*queue.SendMess
 	if err != nil {
 		return nil, err
 	}
-	out, err := q.SendMessage(ctx, &sqs.SendMessageInput{MessageBody: aws.String(string(b)), QueueUrl: &q.url, DelaySeconds: 30})
+	out, err := q.SendMessage(ctx, &sqs.SendMessageInput{MessageBody: aws.String(string(b)), QueueUrl: &q.url, DelaySeconds: 30, MessageGroupId: aws.String(MessageGroupId)})
 	if err != nil {
 		return nil, err
 	}

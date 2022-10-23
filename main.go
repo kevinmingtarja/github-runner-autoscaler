@@ -77,7 +77,9 @@ func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
 	if e.Action == StatusQueued {
 		fmt.Println(StatusQueued)
 		msg, err := s.q.SendJob(ctx, &queue.Job{JobId: e.WorkflowJob.Id})
+		fmt.Println(msg, err)
 		if err != nil {
+			fmt.Println("ERR")
 			return
 		}
 		fmt.Println(msg)
