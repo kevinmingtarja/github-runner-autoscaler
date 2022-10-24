@@ -2,6 +2,7 @@ package runnerscaling
 
 import (
 	"context"
+	"example.com/github-runner-autoscaler/queue"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 )
@@ -14,11 +15,20 @@ const (
 
 type Manager struct {
 	gh *github.Client
+	q queue.WorkflowJobQueue
 }
 
 func SetupManager(accessToken string) *Manager {
 	gh := newGithubClient(accessToken)
-	return &Manager{gh}
+	return &Manager{gh: gh}
+}
+
+func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
+	m.q = q
+}
+
+func (m *Manager) ListenAndHandleScaleUp() {
+
 }
 
 func handleScaleUp() {

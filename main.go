@@ -32,12 +32,12 @@ func run() error {
 	if err != nil {
 		return errors.Wrap(err, "setup queue")
 	}
-	sqsCh := make(chan *queue.Message)
-	go q.Poll(sqsCh)
+	//sqsCh := make(chan *queue.Message)
 
 	log.Println("Setting up gh runner scaling manager")
 	m := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
-	go m.
+	m.RegisterQueue(q)
+	go m.ListenAndHandleScaleUp()
 
 	//go func() {
 	//	msg := <- sqsCh
@@ -51,7 +51,7 @@ func run() error {
 }
 
 type workflowJobEvent struct {
-	Action      string      `json:"action"`
+	Action      string            `json:"action"`
 	WorkflowJob queue.WorkflowJob `json:"workflow_job"`
 }
 

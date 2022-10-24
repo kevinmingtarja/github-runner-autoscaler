@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"log"
 )
 
@@ -30,24 +31,44 @@ func setupSqsQueue(url string) (*sqsQueue, error) {
 	return &sqsQueue{sqs.NewFromConfig(cfg), url}, nil
 }
 
-func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
-	log.Println("Polling SQS queue")
-	for {
-		out, err := q.ReceiveMessage(context.Background(), &sqs.ReceiveMessageInput{
-			QueueUrl:            &q.url,
-			MaxNumberOfMessages: SqsMaxNumberOfMessaged,
-			WaitTimeSeconds:     SqsMaxWaitTimeSeconds,
-		})
+//func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
+//	log.Println("Polling SQS queue")
+//	for {
+//		out, err := q.ReceiveMessage(context.Background(), &sqs.ReceiveMessageInput{
+//			QueueUrl:            &q.url,
+//			MaxNumberOfMessages: SqsMaxNumberOfMessaged,
+//			WaitTimeSeconds:     SqsMaxWaitTimeSeconds,
+//		})
+//
+//		if err != nil {
+//			log.Fatalf("Failed to fetch sqs message %v", err)
+//		}
+//
+//		for _, message := range out.Messages {
+//			log.Printf("Received message with id %s\n", *message.MessageId)
+//			ch <- &queue.Message{Body: message.Body, MessageId: message.MessageId}
+//		}
+//	}
+//}
 
-		if err != nil {
-			log.Fatalf("Failed to fetch sqs message %v", err)
-		}
+func (q *sqsQueue) ReceiveJob(ctx context.Context) ([]types.Message, error) {
+	out, err := q.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl:            &q.url,
+		MaxNumberOfMessages: SqsMaxNumberOfMessaged,
+		WaitTimeSeconds:     SqsMaxWaitTimeSeconds,
+	})
 
-		for _, message := range out.Messages {
-			log.Printf("Received message with id %s\n", *message.MessageId)
-			ch <- &queue.Message{Body: message.Body, MessageId: message.MessageId}
-		}
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalf("Failed to fetch sqs message %v", err)
 	}
+
+	//for _, message := range out.Messages {
+	//	log.Printf("Received message with id %s\n", *message.MessageId)
+	//	ch <- &queue.Message{Body: message.Body, MessageId: message.MessageId}
+	//}
+
+	return out.Messages, nil
 }
 
 func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.SendMessageOutput, error) {
