@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"log"
 	"net/http"
 	"os"
 )
@@ -23,11 +24,13 @@ func main() {
 }
 
 func run() error {
+	log.Println("Loading environment variables")
 	err := godotenv.Load(".env")
 	if err != nil {
 		return errors.Wrap(err, "environment variables")
 	}
 
+	log.Println("Setting up connection with SQS queue")
 	q, err := setupSqsQueue(os.Getenv("QUEUE_URL"))
 	if err != nil {
 		return errors.Wrap(err, "setup queue")
@@ -42,7 +45,7 @@ func run() error {
 
 	srv := initServer(q)
 
-	fmt.Printf("Starting server at port 8080\n")
+	log.Println("Starting server at port 8080")
 	return http.ListenAndServe(":8080", srv)
 }
 
@@ -63,6 +66,8 @@ type workflowJob struct {
 }
 
 func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
+	// TO-DO: Add better request logging
+	log.Printf("Handling request: %s %s\n", r.Method, r.URL.String())
 	ctx := context.Background()
 
 	var e workflowJobEvent
@@ -72,21 +77,14 @@ func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(e)
+	log.Printf("Receive workflow job of action '%s'\n", e.Action)
 	if e.Action == StatusQueued {
-		fmt.Println(StatusQueued)
-		msg, err := s.q.SendJob(ctx, &queue.Job{JobId: e.WorkflowJob.Id})
-		fmt.Println(msg, err)
+		msg, err := s.q.SendJob(ctx, &queue.WorkflowJob{Id: e.WorkflowJob.Id})
 		if err != nil {
-			fmt.Println("ERR")
+			log.Println(err)
 			return
 		}
-		fmt.Println(msg)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte("Success"))
-	if err != nil {
-		return
-	}
+	log.Println("Finish handling request")
 }

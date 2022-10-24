@@ -2,9 +2,9 @@ package queue
 
 import "context"
 
-type JobQueue interface {
+type WorkflowJobQueue interface {
 	Poll(ch chan<- *Message)
-	SendJob(ctx context.Context, job *Job) (*SendMessageOutput, error)
+	SendJob(ctx context.Context, job *WorkflowJob) (*SendMessageOutput, error)
 }
 
 type Message struct {
@@ -16,6 +16,6 @@ type SendMessageOutput struct {
 	MessageId *string
 }
 
-type Job struct {
-	JobId int `json:"job_id"`
+type WorkflowJob struct {
+	Id int `json:"id"`
 }

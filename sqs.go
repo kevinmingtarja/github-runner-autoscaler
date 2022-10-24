@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -34,6 +33,7 @@ func setupSqsQueue(url string) (*sqsQueue, error) {
 }
 
 func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
+	log.Println("Polling SQS queue")
 	for {
 		out, err := q.ReceiveMessage(context.Background(), &sqs.ReceiveMessageInput{
 			QueueUrl:            &q.url,
@@ -42,17 +42,18 @@ func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
 		})
 
 		if err != nil {
-			log.Fatalf("failed to fetch sqs message %v", err)
+			log.Fatalf("Failed to fetch sqs message %v", err)
 		}
 
 		for _, message := range out.Messages {
-			fmt.Println("RECV", message.MessageId)
+			log.Printf("Received message with id %s\n", *message.MessageId)
 			ch <- &queue.Message{Body: message.Body, MessageId: message.MessageId}
 		}
 	}
 }
 
-func (q *sqsQueue) SendJob(ctx context.Context, job *queue.Job) (*queue.SendMessageOutput, error) {
+func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.SendMessageOutput, error) {
+	log.Printf("Sending job %d to SQS", job.Id)
 	b, err := json.Marshal(*job)
 	if err != nil {
 		return nil, err

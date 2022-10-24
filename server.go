@@ -2,15 +2,16 @@ package main
 
 import (
 	"example.com/github-runner-autoscaler/queue"
+	"log"
 	"net/http"
 )
 
 type server struct {
 	router *http.ServeMux
-	q      queue.JobQueue
+	q      queue.WorkflowJobQueue
 }
 
-func initServer(q queue.JobQueue) *server {
+func initServer(q queue.WorkflowJobQueue) *server {
 	srv := &server{
 		router: http.DefaultServeMux,
 		q:      q,
@@ -20,6 +21,7 @@ func initServer(q queue.JobQueue) *server {
 }
 
 func (s *server) routes() {
+	log.Println("Registering server function handlers")
 	// HandleFunc add handlers to DefaultServeMux
 	http.HandleFunc("/webhook", s.handleWebhookEvent)
 }
