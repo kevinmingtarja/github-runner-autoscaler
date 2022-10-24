@@ -5,12 +5,14 @@ import (
 	"example.com/github-runner-autoscaler/queue"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
+	"log"
 )
 
 const (
 	githubRepoOwner = "kevinmingtarja"
 	githubRepoName  = "dgraph"
 	StatusQueued = "queued"
+	MaxRunners = 4
 )
 
 type Manager struct {
@@ -28,17 +30,37 @@ func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
 }
 
 func (m *Manager) ListenAndHandleScaleUp() {
+	ctx := context.Background()
+	for {
+		jobs, err := m.q.ReceiveJobs(ctx)
+		if err != nil {
+			// TO-DO: Improve error handling
+			log.Fatalf("Failed to fetch sqs message %v", err)
+		}
 
+		for _, job := range jobs {
+			go m.handleScaleUp(ctx, job.Id)
+		}
+	}
 }
 
-func handleScaleUp() {
-	//ctx := context.Background()
-	//var jobId int64 = 123
-	//isQueued, err := isJobQueued(ctx, client, jobId)
-	//if err != nil {
-	//	return
-	//}
-	//fmt.Println(isQueued)
+func (m *Manager) handleScaleUp(ctx context.Context, workflowJobId int) {
+	log.Printf("Processing job %d\n", workflowJobId)
+	isQueued, err := m.isJobQueued(ctx, int64(workflowJobId))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if !isQueued {
+		log.Printf("Job %d is no longer queued in github, no runners will be created.\n", workflowJobId)
+		return
+	}
+
+	log.Printf("Current runners: ... out of MaxRunners")
+
+	log.Printf("Creating a new runner")
+
+	log.Printf("Runner created")
 }
 
 func newGithubClient(accessToken string) *github.Client {
@@ -50,13 +72,13 @@ func newGithubClient(accessToken string) *github.Client {
 	return github.NewClient(tc)
 }
 
-func getWorkflowJobByID(ctx context.Context, client *github.Client, jobId int64) (*github.WorkflowJob, error) {
-	jobForWorkflowRun, _, err := client.Actions.GetWorkflowJobByID(ctx, githubRepoOwner, githubRepoName, jobId)
+func (m *Manager) getWorkflowJobByID(ctx context.Context, jobId int64) (*github.WorkflowJob, error) {
+	jobForWorkflowRun, _, err := m.gh.Actions.GetWorkflowJobByID(ctx, githubRepoOwner, githubRepoName, jobId)
 	return jobForWorkflowRun, err
 }
 
-func isJobQueued(ctx context.Context, client *github.Client, jobId int64) (bool, error) {
-	job, err := getWorkflowJobByID(ctx, client, jobId)
+func (m *Manager) isJobQueued(ctx context.Context, jobId int64) (bool, error) {
+	job, err := m.getWorkflowJobByID(ctx, jobId)
 	if err != nil {
 		return false, err
 	}
