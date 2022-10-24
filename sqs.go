@@ -59,8 +59,8 @@ func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.
 	out, err := q.SendMessage(
 		ctx,
 		&sqs.SendMessageInput{
-			MessageBody: aws.String(string(b)),
-			QueueUrl: &q.url,
+			MessageBody:    aws.String(string(b)),
+			QueueUrl:       &q.url,
 			MessageGroupId: aws.String(MessageGroupId),
 		},
 	)
