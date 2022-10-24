@@ -8,6 +8,11 @@ import (
 	"os"
 )
 
+const (
+	githubRepoOwner = "kevinmingtarja"
+	githubRepoName = "dgraph"
+)
+
 func handleScaleUp() {
 	ctx := context.Background()
 	client := newGithubClient()
@@ -30,7 +35,7 @@ func newGithubClient() *github.Client {
 }
 
 func getWorkflowJobByID(ctx context.Context, client *github.Client, jobId int64) (*github.WorkflowJob, error) {
-	jobForWorkflowRun, _, err := client.Actions.GetWorkflowJobByID(ctx, "kevinmingtarja", "dgraph", jobId)
+	jobForWorkflowRun, _, err := client.Actions.GetWorkflowJobByID(ctx, githubRepoOwner, githubRepoName, jobId)
 	return jobForWorkflowRun, err
 }
 
