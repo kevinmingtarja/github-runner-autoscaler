@@ -49,7 +49,8 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 	log.Printf("Processing job %d\n", workflowJobId)
 	isQueued, err := m.isJobQueued(ctx, int64(workflowJobId))
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		log.Fatalln("Hint: queue.Message schema might have changed while there is still messages with the old schema in the queue")
 	}
 
 	if !isQueued {
