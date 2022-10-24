@@ -1,36 +1,42 @@
-package main
+package runnerscaling
 
 import (
 	"context"
-	"fmt"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
-	"os"
 )
 
 const (
 	githubRepoOwner = "kevinmingtarja"
 	githubRepoName  = "dgraph"
+	StatusQueued = "queued"
 )
 
-func handleScaleUp() {
-	ctx := context.Background()
-	client := newGithubClient()
-	var jobId int64 = 123
-	isQueued, err := isJobQueued(ctx, client, jobId)
-	if err != nil {
-		return
-	}
-	fmt.Println(isQueued)
+type Manager struct {
+	gh *github.Client
 }
 
-func newGithubClient() *github.Client {
+func SetupManager(accessToken string) *Manager {
+	gh := newGithubClient(accessToken)
+	return &Manager{gh}
+}
+
+func handleScaleUp() {
+	//ctx := context.Background()
+	//var jobId int64 = 123
+	//isQueued, err := isJobQueued(ctx, client, jobId)
+	//if err != nil {
+	//	return
+	//}
+	//fmt.Println(isQueued)
+}
+
+func newGithubClient(accessToken string) *github.Client {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("GITHUB_TOKEN")},
+		&oauth2.Token{AccessToken: accessToken},
 	)
 	tc := oauth2.NewClient(ctx, ts)
-
 	return github.NewClient(tc)
 }
 
