@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -47,13 +46,12 @@ func (q *sqsQueue) ReceiveMessages(ctx context.Context) ([]queue.Message, error)
 	messages := make([]queue.Message, len(out.Messages))
 	var wj queue.WorkflowJob
 	for i, m := range out.Messages {
-		fmt.Println(*m.Body)
+		log.Printf("Received: Message %s\n", *m.Body)
 		err := json.Unmarshal([]byte(*m.Body), &wj)
 		if err != nil {
 			return nil, err
 		}
 		messages[i] = queue.Message{Id: m.MessageId, WorkflowJob: queue.WorkflowJob{Id: wj.Id}, ReceiptHandle: m.ReceiptHandle}
-		log.Printf("Received: Workflow job %d\n", wj.Id)
 	}
 
 	return messages, nil
