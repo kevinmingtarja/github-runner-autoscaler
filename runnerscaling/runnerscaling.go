@@ -32,19 +32,20 @@ func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
 func (m *Manager) ListenAndHandleScaleUp() {
 	ctx := context.Background()
 	for {
-		jobs, err := m.q.ReceiveJobs(ctx)
+		messages, err := m.q.ReceiveMessages(ctx)
 		if err != nil {
 			// TO-DO: Improve error handling
 			log.Fatalf("Failed to fetch sqs message %v", err)
 		}
 
-		for _, job := range jobs {
-			go m.handleScaleUp(ctx, job.Id)
+		for _, msg := range messages {
+			go m.handleScaleUp(ctx, msg)
 		}
 	}
 }
 
-func (m *Manager) handleScaleUp(ctx context.Context, workflowJobId int) {
+func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
+	workflowJobId := msg.WorkflowJob.Id
 	log.Printf("Processing job %d\n", workflowJobId)
 	isQueued, err := m.isJobQueued(ctx, int64(workflowJobId))
 	if err != nil {
@@ -52,6 +53,7 @@ func (m *Manager) handleScaleUp(ctx context.Context, workflowJobId int) {
 	}
 
 	if !isQueued {
+		// Even if we receive duplicate messages from the queue, this will prevent us from processing it more than once
 		log.Printf("Job %d is no longer queued in github, no runners will be created.\n", workflowJobId)
 		return
 	}
@@ -61,6 +63,11 @@ func (m *Manager) handleScaleUp(ctx context.Context, workflowJobId int) {
 	log.Printf("Creating a new runner")
 
 	log.Printf("Runner created")
+
+	err = m.q.MarkMessageAsDone(ctx, msg)
+	if err != nil {
+		return
+	}
 }
 
 func newGithubClient(accessToken string) *github.Client {

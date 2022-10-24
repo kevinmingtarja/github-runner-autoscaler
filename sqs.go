@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -30,31 +31,32 @@ func setupSqsQueue(url string) (*sqsQueue, error) {
 	return &sqsQueue{sqs.NewFromConfig(cfg), url}, nil
 }
 
-func (q *sqsQueue) ReceiveJobs(ctx context.Context) ([]queue.WorkflowJob, error) {
+func (q *sqsQueue) ReceiveMessages(ctx context.Context) ([]queue.Message, error) {
 	waitTimeSeconds := SqsMaxWaitTimeSeconds
 	log.Printf("Polling SQS for %d seconds\n", waitTimeSeconds)
 	out, err := q.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            &q.url,
 		MaxNumberOfMessages: SqsMaxNumberOfMessaged,
-		WaitTimeSeconds: int32(waitTimeSeconds), // Long polling to reduce network calls
+		WaitTimeSeconds:     int32(waitTimeSeconds), // Long polling to reduce network calls
 	})
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("Received %d message(s)\n", len(out.Messages))
 
-	jobs := make([]queue.WorkflowJob, len(out.Messages))
+	messages := make([]queue.Message, len(out.Messages))
 	var wj queue.WorkflowJob
 	for i, m := range out.Messages {
+		fmt.Println(*m.Body)
 		err := json.Unmarshal([]byte(*m.Body), &wj)
 		if err != nil {
 			return nil, err
 		}
-		jobs[i] = queue.WorkflowJob{Id: wj.Id}
+		messages[i] = queue.Message{Id: m.MessageId, WorkflowJob: queue.WorkflowJob{Id: wj.Id}, ReceiptHandle: m.ReceiptHandle}
 		log.Printf("Received: Workflow job %d\n", wj.Id)
 	}
 
-	return jobs, nil
+	return messages, nil
 }
 
 func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.SendMessageOutput, error) {
@@ -75,4 +77,15 @@ func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.
 		return nil, err
 	}
 	return &queue.SendMessageOutput{MessageId: out.MessageId}, nil
+}
+
+func (q *sqsQueue) MarkMessageAsDone(ctx context.Context, msg queue.Message) error {
+	log.Printf("Attempting to mark message %s as done", *msg.Id)
+	_, err := q.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: &q.url, ReceiptHandle: msg.ReceiptHandle})
+	if err != nil {
+		log.Printf("Failed to mark message %s as done", *msg.Id)
+		return err
+	}
+	log.Printf("Succesfully marked message %s as done", *msg.Id)
+	return nil
 }

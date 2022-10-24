@@ -5,14 +5,15 @@ import (
 )
 
 type WorkflowJobQueue interface {
-	//Poll(ch chan<- *Message)
 	SendJob(ctx context.Context, job *WorkflowJob) (*SendMessageOutput, error)
-	ReceiveJobs(ctx context.Context) ([]WorkflowJob, error)
+	ReceiveMessages(ctx context.Context) ([]Message, error)
+	MarkMessageAsDone(ctx context.Context, msg Message) error
 }
 
 type Message struct {
-	Body *string
-	MessageId *string
+	Id *string
+	WorkflowJob WorkflowJob
+	ReceiptHandle *string
 }
 
 type SendMessageOutput struct {
