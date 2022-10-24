@@ -34,7 +34,8 @@ const (
 )
 
 var (
-	kmsKeyId string
+	kmsKeyId              string
+	iamInstanceProfileArn string
 )
 
 type Manager struct {
@@ -46,6 +47,8 @@ type Manager struct {
 
 func SetupManager(accessToken string) (*Manager, error) {
 	kmsKeyId = os.Getenv("KMS_KEY_ID")
+	iamInstanceProfileArn = os.Getenv("IAM_ARN")
+
 	gh := setupGithubClient(accessToken)
 	ssmc, err := setupSsm()
 	if err != nil {
@@ -100,9 +103,18 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 	log.Printf("Current runners: %d out of %d", n, MaxRunners)
 	log.Println(runners)
 
-	log.Printf("Creating a new runner")
+	if n >= MaxRunners {
+		log.Println("Max number of runners reached. No runners will be created")
+		return
+	}
 
 	runnerName := createEc2InstanceName()
+	err = m.createNewRunner(ctx, runnerName)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
+
 	token, err := m.createRunnerAuthToken(ctx)
 	if err != nil {
 		// TO-DO: Improve error handling
@@ -114,8 +126,6 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 		// TO-DO: Improve error handling
 		log.Fatalln(err)
 	}
-
-	log.Printf("Runner created")
 
 	err = m.q.MarkMessageAsDone(ctx, msg)
 	if err != nil {
@@ -216,6 +226,32 @@ func (m *Manager) isJobQueued(ctx context.Context, jobId int64) (bool, error) {
 		return false, err
 	}
 	return Status(*job.Status) == StatusQueued, nil
+}
+
+func (m *Manager) createNewRunner(ctx context.Context, name string) error {
+	log.Println("Attempting to create new ec2 instance")
+	instance, err := m.ec2c.RunInstances(
+		ctx,
+		&ec2.RunInstancesInput{
+			MinCount:     aws.Int32(1),
+			MaxCount:     aws.Int32(1),
+			ImageId:      "TODO",
+			InstanceType: ec2Types.InstanceTypeT2Nano, // TO-DO
+			IamInstanceProfile: &ec2Types.IamInstanceProfileSpecification{
+				Arn: aws.String(iamInstanceProfileArn),
+			},
+			UserData: aws.String("github actions setup script"),
+			TagSpecifications: []ec2Types.TagSpecification{{
+				ResourceType: ec2Types.ResourceTypeInstance,
+				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: aws.String(name)}}},
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf("Created instance %+v", instance)
+	return nil
 }
 
 // Generates a name of ec2NamePrefix + random string
