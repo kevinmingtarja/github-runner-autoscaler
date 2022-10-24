@@ -35,7 +35,10 @@ func run() error {
 	//sqsCh := make(chan *queue.Message)
 
 	log.Println("Setting up gh runner scaling manager")
-	m := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
+	m, err := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
+	if err != nil {
+		return errors.Wrap(err, "setup gh runner scaling manager")
+	}
 	m.RegisterQueue(q)
 	go m.ListenAndHandleScaleUp()
 
@@ -51,8 +54,8 @@ func run() error {
 }
 
 type workflowJobEvent struct {
-	Action      string            `json:"action"`
-	WorkflowJob queue.WorkflowJob `json:"workflow_job"`
+	Action      runnerscaling.Status `json:"action"`
+	WorkflowJob queue.WorkflowJob    `json:"workflow_job"`
 }
 
 func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {

@@ -11,8 +11,8 @@ type WorkflowJobQueue interface {
 }
 
 type Message struct {
-	Id *string
-	WorkflowJob WorkflowJob
+	Id            *string
+	WorkflowJob   WorkflowJob
 	ReceiptHandle *string
 }
 
@@ -21,12 +21,12 @@ type SendMessageOutput struct {
 }
 
 type WorkflowJob struct {
-	Id int `json:"id"`
-	Name string `json:"name"`
-	Url string `json:"url"`
-	StartedAt   string   `json:"started_at"`
-	Labels      []string `json:"labels"`
-	Conclusion  string   `json:"conclusion"`
-	RunnerId    int      `json:"runner_id"`
-	RunnerName  string   `json:"runner_name"`
+	Id         int      `json:"id"`
+	Name       string   `json:"name"`
+	Url        string   `json:"url"`
+	StartedAt  string   `json:"started_at"`
+	Labels     []string `json:"labels"`
+	Conclusion string   `json:"conclusion"`
+	RunnerId   int      `json:"runner_id"`
+	RunnerName string   `json:"runner_name"`
 }

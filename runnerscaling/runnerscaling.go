@@ -3,26 +3,59 @@ package runnerscaling
 import (
 	"context"
 	"example.com/github-runner-autoscaler/queue"
+	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 	"log"
+	"math/rand"
+	"os"
+	"time"
+)
+
+type Status string
+
+// Enum values for Status
+const (
+	StatusQueued Status = "queued"
 )
 
 const (
 	githubRepoOwner = "kevinmingtarja"
 	githubRepoName  = "dgraph"
-	StatusQueued = "queued"
-	MaxRunners = 4
+	ec2NamePrefix   = "gh-runner-"
+	ec2NameLength   = 18
+	MaxRunners      = 4
+)
+
+var (
+	kmsKeyId string
 )
 
 type Manager struct {
-	gh *github.Client
-	q queue.WorkflowJobQueue
+	gh   *github.Client
+	q    queue.WorkflowJobQueue
+	ssmc *ssm.Client
+	ec2c *ec2.Client
 }
 
-func SetupManager(accessToken string) *Manager {
-	gh := newGithubClient(accessToken)
-	return &Manager{gh: gh}
+func SetupManager(accessToken string) (*Manager, error) {
+	kmsKeyId = os.Getenv("KMS_KEY_ID")
+	gh := setupGithubClient(accessToken)
+	ssmc, err := setupSsm()
+	if err != nil {
+		return nil, err
+	}
+	ec2c, err := setupEc2()
+	if err != nil {
+		return nil, err
+	}
+	return &Manager{gh: gh, ssmc: ssmc, ec2c: ec2c}, nil
 }
 
 func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
@@ -59,9 +92,28 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 		return
 	}
 
-	log.Printf("Current runners: ... out of MaxRunners")
+	n, runners, err := m.listCurrentRunners(ctx)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
+	log.Printf("Current runners: %d out of %d", n, MaxRunners)
+	log.Println(runners)
 
 	log.Printf("Creating a new runner")
+
+	runnerName := createEc2InstanceName()
+	token, err := m.createRunnerAuthToken(ctx)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
+
+	err = m.storeToken(ctx, &runnerName, token)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
 
 	log.Printf("Runner created")
 
@@ -71,13 +123,86 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 	}
 }
 
-func newGithubClient(accessToken string) *github.Client {
+func setupGithubClient(accessToken string) *github.Client {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: accessToken},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	return github.NewClient(tc)
+}
+
+func setupSsm() (*ssm.Client, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	return ssm.NewFromConfig(cfg), nil
+}
+
+func setupEc2() (*ec2.Client, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	return ec2.NewFromConfig(cfg), nil
+}
+
+func (m *Manager) createRunnerAuthToken(ctx context.Context) (*string, error) {
+	log.Println("Attempting to create a new token for the new runner")
+	token, _, err := m.gh.Actions.CreateRegistrationToken(ctx, githubRepoOwner, githubRepoName)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Successfully created token")
+	return token.Token, nil
+}
+
+// Stores token as a SecureString in AWS Systems Manager Parameter Store
+func (m *Manager) storeToken(ctx context.Context, runnerName *string, token *string) error {
+	log.Println("Attempting to store token in aws ssm parameter store")
+	_, err := m.ssmc.PutParameter(ctx, &ssm.PutParameterInput{Name: runnerName, Value: token, KeyId: &kmsKeyId, Type: ssmTypes.ParameterTypeSecureString})
+	if err != nil {
+		return err
+	}
+	log.Println("Successfully stored token")
+	return nil
+}
+
+//type ec2Instance struct {
+//	ImageId *string
+//	InstanceId *string
+//	InstanceLifecycle ec2Types.InstanceLifecycleType
+//	InstanceType ec2Types.InstanceType
+//	KeyName *string
+//	LaunchTime *time.Time
+//	PublicDnsName *string
+//	State *ec2Types.InstanceState
+//	Tags []ec2Types.Tag
+//}
+
+func (m *Manager) listCurrentRunners(ctx context.Context) (int, []ec2Types.Instance, error) {
+	// TO-DO: Filter with a special tag instead of name
+	filters := []ec2Types.Filter{
+		{
+			Name:   aws.String("tag:Name"),
+			Values: []string{fmt.Sprintf("%s*", ec2NamePrefix)},
+		},
+	}
+	res, err := m.ec2c.DescribeInstances(ctx, &ec2.DescribeInstancesInput{Filters: filters})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	n := 0
+	instances := make([]ec2Types.Instance, 0)
+	for _, r := range res.Reservations {
+		for _, i := range r.Instances {
+			instances = append(instances, i)
+			n++
+		}
+	}
+	return n, instances, nil
 }
 
 func (m *Manager) getWorkflowJobByID(ctx context.Context, jobId int64) (*github.WorkflowJob, error) {
@@ -90,5 +215,13 @@ func (m *Manager) isJobQueued(ctx context.Context, jobId int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return *job.Status == StatusQueued, nil
+	return Status(*job.Status) == StatusQueued, nil
+}
+
+// Generates a name of ec2NamePrefix + random string
+func createEc2InstanceName() string {
+	rand.Seed(time.Now().UnixNano())
+	b := make([]byte, ec2NameLength)
+	rand.Read(b)
+	return fmt.Sprintf("%s%x", ec2NamePrefix, b)[:ec2NameLength]
 }
