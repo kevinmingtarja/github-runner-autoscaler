@@ -55,17 +55,6 @@ type workflowJobEvent struct {
 	WorkflowJob queue.WorkflowJob `json:"workflow_job"`
 }
 
-//type workflowJob struct {
-//	Id          int      `json:"id"`
-//	RunUrl      string   `json:"run_url"`
-//	Conclusion  string   `json:"conclusion"`
-//	StartedAt   string   `json:"started_at"`
-//	CompletedAt string   `json:"completed_at"`
-//	Labels      []string `json:"labels"`
-//	RunnerId    int      `json:"runner_id"`
-//	RunnerName  string   `json:"runner_name"`
-//}
-
 func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
 	// TO-DO: Add better request logging
 	log.Printf("Handling request: %s %s\n", r.Method, r.URL.String())
@@ -78,7 +67,7 @@ func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Receive workflow job of action '%s'\n", e.Action)
+	log.Printf("Receive workflow job: '%+v'\n", e)
 	if e.Action == runnerscaling.StatusQueued {
 		msg, err := s.q.SendJob(ctx, &e.WorkflowJob)
 		if err != nil {
