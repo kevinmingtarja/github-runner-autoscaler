@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -53,19 +51,17 @@ func (q *sqsQueue) Poll(ch chan<- *queue.Message) {
 }
 
 func (q *sqsQueue) SendJob(ctx context.Context, job *queue.WorkflowJob) (*queue.SendMessageOutput, error) {
-	log.Printf("Sending job %d to SQS", job.Id)
+	log.Printf("Sending workflow job %d to SQS", job.Id)
 	b, err := json.Marshal(*job)
 	if err != nil {
 		return nil, err
 	}
-	hash := md5.Sum(b)
 	out, err := q.SendMessage(
 		ctx,
 		&sqs.SendMessageInput{
 			MessageBody: aws.String(string(b)),
 			QueueUrl: &q.url,
 			MessageGroupId: aws.String(MessageGroupId),
-			MessageDeduplicationId: aws.String(hex.EncodeToString(hash[:])),
 		},
 	)
 	if err != nil {

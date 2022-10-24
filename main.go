@@ -84,6 +84,7 @@ func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
+		log.Printf("Successfully sent workflow job %d in message %s\n", e.WorkflowJob.Id, *msg.MessageId)
 	}
 
 	log.Println("Finish handling request")
