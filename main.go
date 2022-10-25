@@ -11,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -32,16 +34,28 @@ func run() error {
 		return errors.Wrap(err, "setup queue")
 	}
 
+	var eg errgroup.Group
+
 	m, err := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
 	if err != nil {
 		return errors.Wrap(err, "setup gh runner scaling manager")
 	}
 	m.RegisterQueue(q)
-	go m.ListenAndHandleScaleUp()
+	eg.Go(func() error {
+		return m.ListenAndHandleScaleUp()
+	})
 
 	srv := initServer(q)
-	log.Println("Starting server at port 8080")
-	return http.ListenAndServe(":8080", srv)
+	eg.Go(func() error {
+		log.Println("Starting server at port 8080")
+		return http.ListenAndServe(":8080", srv)
+	})
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type workflowJobEvent struct {

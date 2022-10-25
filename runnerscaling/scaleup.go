@@ -12,6 +12,7 @@ import (
 	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"math/rand"
 	"os"
@@ -66,22 +67,34 @@ func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
 	m.q = q
 }
 
-func (m *Manager) ListenAndHandleScaleUp() {
+func (m *Manager) ListenAndHandleScaleUp() error {
 	ctx := context.Background()
-	for {
-		messages, err := m.q.ReceiveMessages(ctx)
-		if err != nil {
-			// TO-DO: Improve error handling
-			log.Fatalf("Failed to fetch sqs message %v", err)
-		}
+	var eg errgroup.Group
 
-		for _, msg := range messages {
-			go m.handleScaleUp(ctx, msg)
+	go func() {
+		for {
+			messages, err := m.q.ReceiveMessages(ctx)
+			if err != nil {
+				// TO-DO: Improve error handling
+				log.Fatalf("Failed to fetch sqs message %v", err)
+			}
+
+			for _, msg := range messages {
+				eg.Go(func() error {
+					return m.handleScaleUp(ctx, msg)
+				})
+			}
 		}
+	}()
+
+	if err := eg.Wait(); err != nil {
+		return err
 	}
+
+	return nil
 }
 
-func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
+func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) (err error) {
 	workflowJobId := msg.WorkflowJob.Id
 	log.Printf("Processing job %d\n", workflowJobId)
 	isQueued, err := m.isJobQueued(ctx, int64(workflowJobId))
@@ -93,26 +106,26 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 	if !isQueued {
 		// Even if we receive duplicate messages from the queue, this will prevent us from processing it more than once
 		log.Printf("Job %d is no longer queued in github, no runners will be created.\n", workflowJobId)
-		return
+		return nil
 	}
 
 	n, runners, err := m.listCurrentRunners(ctx)
 	if err != nil {
 		// TO-DO: Improve error handling
-		log.Fatalln(err)
+		return err
 	}
 	log.Printf("Current runners: %d out of %d", n, MaxRunners)
 	log.Println(runners)
 
 	if n >= MaxRunners {
 		log.Println("Max number of runners reached. No runners will be created")
-		return
+		return nil
 	}
 
 	token, err := m.createRunnerAuthToken(ctx)
 	if err != nil {
 		// TO-DO: Improve error handling
-		log.Fatalln(err)
+		return err
 	}
 
 	runnerName := createEc2InstanceName()
@@ -120,26 +133,24 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 	err = m.storeToken(ctx, &runnerName, token)
 	if err != nil {
 		// TO-DO: Improve error handling
-		log.Fatalln(err)
+		return err
 	}
 	defer func() {
 		err = m.deleteToken(ctx, &runnerName)
-		if err != nil {
-			// TO-DO: Improve error handling
-			log.Fatalln(err)
-		}
 	}()
 
 	err = m.createNewRunner(ctx, &runnerName)
 	if err != nil {
 		// TO-DO: Improve error handling
-		log.Fatalln(err)
+		return err
 	}
 
 	err = m.q.MarkMessageAsDone(ctx, msg)
 	if err != nil {
-		return
+		return err
 	}
+
+	return nil
 }
 
 func setupGithubClient(accessToken string) *github.Client {
