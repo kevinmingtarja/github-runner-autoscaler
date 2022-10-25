@@ -234,8 +234,11 @@ func (m *Manager) listCurrentRunners(ctx context.Context) (int, []ec2Types.Insta
 	instances := make([]ec2Types.Instance, 0)
 	for _, r := range res.Reservations {
 		for _, i := range r.Instances {
-			instances = append(instances, i)
-			n++
+			log.Println(i.State.Name)
+			if i.State.Name == ec2Types.InstanceStateNameRunning {
+				instances = append(instances, i)
+				n++
+			}
 		}
 	}
 	return n, instances, nil
