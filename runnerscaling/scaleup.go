@@ -274,8 +274,8 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 				ResourceType: ec2Types.ResourceTypeInstance,
 				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: name}}},
 			},
-			SecurityGroupIds: []string{"sgr-0f7b10b8099aaddcb"}, // TO-DO: Clean up hardcoded configs// TO-DO: Clean up hardcoded configs
-			KeyName:          aws.String("dgraph-personal"),     // TO-DO: Clean up hardcoded configs
+			SecurityGroups: []string{"alll"},              // TO-DO: Clean up hardcoded configs// TO-DO: Clean up hardcoded configs
+			KeyName:        aws.String("dgraph-personal"), // TO-DO: Clean up hardcoded configs
 		},
 	)
 	if err != nil {
