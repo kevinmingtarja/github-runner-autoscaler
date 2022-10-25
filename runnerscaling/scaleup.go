@@ -46,6 +46,7 @@ type Manager struct {
 }
 
 func SetupManager(accessToken string) (*Manager, error) {
+	log.Println("Setting up gh runner scaling manager")
 	kmsKeyId = os.Getenv("KMS_KEY_ID")
 	iamInstanceProfileArn = os.Getenv("IAM_ARN")
 

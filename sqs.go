@@ -22,6 +22,7 @@ type sqsQueue struct {
 }
 
 func setupSqsQueue(url string) (*sqsQueue, error) {
+	log.Println("Setting up connection with SQS queue")
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, err

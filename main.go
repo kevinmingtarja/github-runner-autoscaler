@@ -27,14 +27,11 @@ func run() error {
 		return errors.Wrap(err, "environment variables")
 	}
 
-	log.Println("Setting up connection with SQS queue")
 	q, err := setupSqsQueue(os.Getenv("QUEUE_URL"))
 	if err != nil {
 		return errors.Wrap(err, "setup queue")
 	}
-	//sqsCh := make(chan *queue.Message)
 
-	log.Println("Setting up gh runner scaling manager")
 	m, err := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
 	if err != nil {
 		return errors.Wrap(err, "setup gh runner scaling manager")
@@ -43,7 +40,6 @@ func run() error {
 	go m.ListenAndHandleScaleUp()
 
 	srv := initServer(q)
-
 	log.Println("Starting server at port 8080")
 	return http.ListenAndServe(":8080", srv)
 }
