@@ -38,13 +38,19 @@ func run() error {
 	}
 	m.RegisterQueue(q)
 	go func() {
-		errs <- m.ListenAndHandleScaleUp()
+		err := m.ListenAndHandleScaleUp()
+		if err != nil {
+			errs <- err
+		}
 	}()
 
 	srv := initServer(q)
 	go func() {
 		log.Println("Starting server at port 8080")
-		errs <- http.ListenAndServe(":8080", srv)
+		err := http.ListenAndServe(":8080", srv)
+		if err != nil {
+			errs <- err
+		}
 	}()
 
 	if err := <-errs; err != nil {

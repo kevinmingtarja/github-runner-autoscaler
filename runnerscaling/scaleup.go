@@ -84,14 +84,17 @@ func (m *Manager) ListenAndHandleScaleUp() error {
 			for _, msg := range messages {
 				msg := msg
 				go func() {
-					errs <- m.handleScaleUp(ctx, msg)
+					err := m.handleScaleUp(ctx, msg)
+					if err != nil {
+						errs <- err
+					}
 				}()
 			}
 		}
 	}
 }
 
-func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) (err error) {
+func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) error {
 	workflowJobId := msg.WorkflowJob.Id
 	log.Printf("Processing job %d\n", workflowJobId)
 	isQueued, err := m.isJobQueued(ctx, int64(workflowJobId))
@@ -132,9 +135,7 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) (err err
 		// TO-DO: Improve error handling
 		return err
 	}
-	defer func() {
-		err = m.deleteToken(ctx, &runnerName)
-	}()
+	defer m.deleteToken(ctx, &runnerName)
 
 	err = m.createNewRunner(ctx, &runnerName)
 	if err != nil {
