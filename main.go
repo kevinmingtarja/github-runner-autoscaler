@@ -11,8 +11,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-
-	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -34,24 +32,24 @@ func run() error {
 		return errors.Wrap(err, "setup queue")
 	}
 
-	var eg errgroup.Group
+	errs := make(chan error, 1)
 
 	m, err := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
 	if err != nil {
 		return errors.Wrap(err, "setup gh runner scaling manager")
 	}
 	m.RegisterQueue(q)
-	eg.Go(func() error {
-		return m.ListenAndHandleScaleUp()
-	})
+	go func() {
+		errs <- m.ListenAndHandleScaleUp()
+	}()
 
 	srv := initServer(q)
-	eg.Go(func() error {
+	go func() {
 		log.Println("Starting server at port 8080")
-		return http.ListenAndServe(":8080", srv)
-	})
+		errs <- http.ListenAndServe(":8080", srv)
+	}()
 
-	if err := eg.Wait(); err != nil {
+	if err := <-errs; err != nil {
 		return err
 	}
 

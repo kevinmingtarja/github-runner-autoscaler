@@ -12,7 +12,6 @@ import (
 	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"math/rand"
 	"os"
@@ -69,10 +68,13 @@ func (m *Manager) RegisterQueue(q queue.WorkflowJobQueue) {
 
 func (m *Manager) ListenAndHandleScaleUp() error {
 	ctx := context.Background()
-	var eg errgroup.Group
+	errs := make(chan error, 1)
 
-	go func() {
-		for {
+	for {
+		select {
+		case err := <-errs:
+			return err
+		default:
 			messages, err := m.q.ReceiveMessages(ctx)
 			if err != nil {
 				// TO-DO: Improve error handling
@@ -80,18 +82,13 @@ func (m *Manager) ListenAndHandleScaleUp() error {
 			}
 
 			for _, msg := range messages {
-				eg.Go(func() error {
-					return m.handleScaleUp(ctx, msg)
-				})
+				msg := msg
+				go func() {
+					errs <- m.handleScaleUp(ctx, msg)
+				}()
 			}
 		}
-	}()
-
-	if err := eg.Wait(); err != nil {
-		return err
 	}
-
-	return nil
 }
 
 func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) (err error) {
