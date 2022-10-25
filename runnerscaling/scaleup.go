@@ -122,14 +122,15 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 		// TO-DO: Improve error handling
 		log.Fatalln(err)
 	}
+	defer func() {
+		err = m.deleteToken(ctx, &runnerName)
+		if err != nil {
+			// TO-DO: Improve error handling
+			log.Fatalln(err)
+		}
+	}()
 
 	err = m.createNewRunner(ctx, &runnerName)
-	if err != nil {
-		// TO-DO: Improve error handling
-		log.Fatalln(err)
-	}
-
-	err = m.deleteToken(ctx, &runnerName)
 	if err != nil {
 		// TO-DO: Improve error handling
 		log.Fatalln(err)
