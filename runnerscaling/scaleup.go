@@ -34,6 +34,7 @@ const (
 	ec2UserData     = `
 #cloud-boothook
 #!/bin/bash
+echo DEBUGGING > /home/ubuntu/debug.out
 chmod +x /home/ubuntu/init-runner.sh
 sh /home/ubuntu/init-runner.sh
 `
@@ -260,8 +261,8 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 		&ec2.RunInstancesInput{
 			MinCount:     aws.Int32(1),
 			MaxCount:     aws.Int32(1),
-			ImageId:      aws.String("ami-0b3cf9d25a3c43687"),
-			InstanceType: ec2Types.InstanceTypeM6a4xlarge, // TO-DO
+			ImageId:      aws.String("ami-0b3cf9d25a3c43687"), // TO-DO: Clean up hardcoded configs
+			InstanceType: ec2Types.InstanceTypeM6a4xlarge,     // TO-DO
 			IamInstanceProfile: &ec2Types.IamInstanceProfileSpecification{
 				Arn: aws.String(iamInstanceProfileArn),
 			},
@@ -270,6 +271,8 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 				ResourceType: ec2Types.ResourceTypeInstance,
 				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: name}}},
 			},
+			SecurityGroupIds: []string{"sgr-0f7b10b8099aaddcb"}, // TO-DO: Clean up hardcoded configs// TO-DO: Clean up hardcoded configs
+			KeyName:          aws.String("dgraph-personal"),     // TO-DO: Clean up hardcoded configs
 		},
 	)
 	if err != nil {
