@@ -42,11 +42,6 @@ func run() error {
 	m.RegisterQueue(q)
 	go m.ListenAndHandleScaleUp()
 
-	//go func() {
-	//	msg := <- sqsCh
-	//	// handle scale up
-	//}()
-
 	srv := initServer(q)
 
 	log.Println("Starting server at port 8080")

@@ -108,20 +108,27 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) {
 		return
 	}
 
-	runnerName := createEc2InstanceName()
-	err = m.createNewRunner(ctx, runnerName)
-	if err != nil {
-		// TO-DO: Improve error handling
-		log.Fatalln(err)
-	}
-
 	token, err := m.createRunnerAuthToken(ctx)
 	if err != nil {
 		// TO-DO: Improve error handling
 		log.Fatalln(err)
 	}
 
+	runnerName := createEc2InstanceName()
+
 	err = m.storeToken(ctx, &runnerName, token)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
+
+	err = m.createNewRunner(ctx, &runnerName)
+	if err != nil {
+		// TO-DO: Improve error handling
+		log.Fatalln(err)
+	}
+
+	err = m.deleteToken(ctx, &runnerName)
 	if err != nil {
 		// TO-DO: Improve error handling
 		log.Fatalln(err)
@@ -228,22 +235,22 @@ func (m *Manager) isJobQueued(ctx context.Context, jobId int64) (bool, error) {
 	return Status(*job.Status) == StatusQueued, nil
 }
 
-func (m *Manager) createNewRunner(ctx context.Context, name string) error {
+func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 	log.Println("Attempting to create new ec2 instance")
 	instance, err := m.ec2c.RunInstances(
 		ctx,
 		&ec2.RunInstancesInput{
 			MinCount:     aws.Int32(1),
 			MaxCount:     aws.Int32(1),
-			ImageId:      "TODO",
-			InstanceType: ec2Types.InstanceTypeT2Nano, // TO-DO
+			ImageId:      aws.String("ami-0b3cf9d25a3c43687"),
+			InstanceType: ec2Types.InstanceTypeM6a4xlarge, // TO-DO
 			IamInstanceProfile: &ec2Types.IamInstanceProfileSpecification{
 				Arn: aws.String(iamInstanceProfileArn),
 			},
-			UserData: aws.String("github actions setup script"),
+			UserData: aws.String("file:///home/ubuntu/init-runner.sh"),
 			TagSpecifications: []ec2Types.TagSpecification{{
 				ResourceType: ec2Types.ResourceTypeInstance,
-				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: aws.String(name)}}},
+				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: name}}},
 			},
 		},
 	)
@@ -251,6 +258,16 @@ func (m *Manager) createNewRunner(ctx context.Context, name string) error {
 		return err
 	}
 	log.Printf("Created instance %+v", instance)
+	return nil
+}
+
+func (m *Manager) deleteToken(ctx context.Context, runnerName *string) error {
+	log.Println("Attempting to delete token from aws ssm parameter store")
+	_, err := m.ssmc.DeleteParameter(ctx, &ssm.DeleteParameterInput{Name: runnerName})
+	if err != nil {
+		return err
+	}
+	log.Println("Successfully deleted token")
 	return nil
 }
 
