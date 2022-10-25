@@ -12,7 +12,6 @@ require (
 	github.com/joho/godotenv v1.4.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
-	golang.org/x/sync v0.1.0
 )
 
 require (
