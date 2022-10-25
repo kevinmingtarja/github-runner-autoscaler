@@ -32,7 +32,7 @@ func setupSqsQueue(url string) (*sqsQueue, error) {
 }
 
 func (q *sqsQueue) ReceiveMessages(ctx context.Context) ([]queue.Message, error) {
-	waitTimeSeconds := SqsMaxWaitTimeSeconds
+	waitTimeSeconds := 5
 	log.Printf("Polling SQS for %d seconds\n", waitTimeSeconds)
 	out, err := q.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            &q.url,

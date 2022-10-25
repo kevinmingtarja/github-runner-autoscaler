@@ -265,6 +265,7 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 		},
 	)
 	if err != nil {
+		log.Println("Failed to create new ec2 instance")
 		return err
 	}
 	log.Printf("Created instance %+v", instance)
