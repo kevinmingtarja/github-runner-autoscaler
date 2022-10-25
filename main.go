@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"example.com/github-runner-autoscaler/queue"
 	"example.com/github-runner-autoscaler/runnerscaling"
-	"fmt"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"log"
@@ -15,8 +14,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
+		log.Fatalf("%s\n", err)
 	}
 }
 
