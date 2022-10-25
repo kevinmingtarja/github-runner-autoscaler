@@ -2,6 +2,7 @@ package runnerscaling
 
 import (
 	"context"
+	"encoding/base64"
 	"example.com/github-runner-autoscaler/queue"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -30,7 +31,13 @@ const (
 	githubRepoName  = "dgraph"
 	ec2NamePrefix   = "gh-runner-"
 	ec2NameLength   = 18
-	MaxRunners      = 4
+	ec2UserData     = `
+#cloud-boothook
+#!/bin/bash
+chmod +x /home/ubuntu/init-runner.sh
+sh /home/ubuntu/init-runner.sh
+`
+	MaxRunners = 4
 )
 
 var (
@@ -258,7 +265,7 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 			IamInstanceProfile: &ec2Types.IamInstanceProfileSpecification{
 				Arn: aws.String(iamInstanceProfileArn),
 			},
-			UserData: aws.String("file:///home/ubuntu/init-runner.sh"),
+			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(ec2UserData))),
 			TagSpecifications: []ec2Types.TagSpecification{{
 				ResourceType: ec2Types.ResourceTypeInstance,
 				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: name}}},
