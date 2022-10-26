@@ -44,6 +44,10 @@ sh /home/ubuntu/init-runner.sh
 var (
 	kmsKeyId              string
 	iamInstanceProfileArn string
+	amiId                 string
+	ec2InstanceType       ec2Types.InstanceType
+	ec2KeyName            string
+	ec2SecurityGroup      string
 )
 
 type Manager struct {
@@ -57,6 +61,10 @@ func SetupManager(accessToken string) (*Manager, error) {
 	log.Println("Setting up gh runner scaling manager")
 	kmsKeyId = os.Getenv("KMS_KEY_ID")
 	iamInstanceProfileArn = os.Getenv("IAM_ARN")
+	amiId = os.Getenv("AMI_ID")
+	ec2InstanceType = ec2Types.InstanceType(os.Getenv("EC2_INSTANCE_TYPE"))
+	ec2KeyName = os.Getenv("EC2_KEY_NAME")
+	ec2SecurityGroup = os.Getenv("EC2_SG")
 
 	gh := setupGithubClient(accessToken)
 	ssmc, err := setupSsm()
@@ -143,7 +151,7 @@ func (m *Manager) handleScaleUp(ctx context.Context, msg queue.Message) error {
 		// TO-DO: Improve error handling
 		return err
 	}
-	defer m.deleteToken(ctx, &runnerName)
+	//defer m.deleteToken(ctx, &runnerName)
 
 	err = m.createNewRunner(ctx, &runnerName)
 	if err != nil {
@@ -264,8 +272,8 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 		&ec2.RunInstancesInput{
 			MinCount:     aws.Int32(1),
 			MaxCount:     aws.Int32(1),
-			ImageId:      aws.String("ami-0b3cf9d25a3c43687"), // TO-DO: Clean up hardcoded configs
-			InstanceType: ec2Types.InstanceTypeM6a4xlarge,     // TO-DO
+			ImageId:      aws.String(amiId), // TO-DO: Clean up hardcoded configs
+			InstanceType: ec2InstanceType,   // TO-DO
 			IamInstanceProfile: &ec2Types.IamInstanceProfileSpecification{
 				Arn: aws.String(iamInstanceProfileArn),
 			},
@@ -274,8 +282,8 @@ func (m *Manager) createNewRunner(ctx context.Context, name *string) error {
 				ResourceType: ec2Types.ResourceTypeInstance,
 				Tags:         []ec2Types.Tag{{Key: aws.String("Name"), Value: name}}},
 			},
-			SecurityGroups: []string{"alll"},              // TO-DO: Clean up hardcoded configs// TO-DO: Clean up hardcoded configs
-			KeyName:        aws.String("dgraph-personal"), // TO-DO: Clean up hardcoded configs
+			SecurityGroups: []string{ec2SecurityGroup},
+			KeyName:        aws.String(ec2KeyName),
 		},
 	)
 	if err != nil {
