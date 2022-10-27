@@ -6,11 +6,11 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.17.1
 	github.com/aws/aws-sdk-go-v2/config v1.17.9
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.3
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.19.11
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.31.3
 	github.com/google/go-github/v48 v48.0.0
 	github.com/joho/godotenv v1.4.0
 	github.com/pkg/errors v0.9.1
+	github.com/spf13/pflag v1.0.5
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 )
 

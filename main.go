@@ -1,15 +1,34 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"example.com/github-runner-autoscaler/queue"
-	"example.com/github-runner-autoscaler/runnerscaling"
+	"example.com/github-runner-autoscaler/worker"
+	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	"log"
-	"net/http"
 	"os"
+)
+
+var (
+	arch = pflag.StringP("arch", "", "amd",
+		"architecture of the machine (amd or arm)")
+	kmsKeyId = pflag.StringP("kms-key-id", "", "amd",
+		"id of the AWS KMS key used to encrypt secrets")
+	iamInstanceProfileArn = pflag.StringP("iam-arn", "", "amd",
+		"id of the AWS KMS key used to encrypt secrets")
+	amiId                 string
+	ec2InstanceType       ec2Types.InstanceType
+	ec2KeyName            string
+	ec2SecurityGroup      string
+
+
+	baseDir = pflag.StringP("base", "", "../",
+		"Base dir for Dgraph")
+	runPkg = pflag.StringP("pkg", "p", "",
+		"Only run tests for this package")
+	runTest = pflag.StringP("test", "t", "",
+		"Only run this test")
 )
 
 func main() {
@@ -25,67 +44,31 @@ func run() error {
 		return errors.Wrap(err, "environment variables")
 	}
 
-	q, err := setupSqsQueue(os.Getenv("QUEUE_URL"))
+	w, err := worker.Setup(os.Getenv("GITHUB_TOKEN"))
 	if err != nil {
-		return errors.Wrap(err, "setup queue")
+		return errors.Wrap(err, "setup scaling worker")
 	}
 
-	errs := make(chan error, 1)
-
-	m, err := runnerscaling.SetupManager(os.Getenv("GITHUB_TOKEN"))
+	err = w.ScaleUp()
 	if err != nil {
-		return errors.Wrap(err, "setup gh runner scaling manager")
-	}
-	m.RegisterQueue(q)
-	go func() {
-		err := m.ListenAndHandleScaleUp()
-		if err != nil {
-			errs <- err
-		}
-	}()
-
-	srv := initServer(q)
-	go func() {
-		log.Println("Starting server at port 8080")
-		err := http.ListenAndServe(":8080", srv)
-		if err != nil {
-			errs <- err
-		}
-	}()
-
-	if err := <-errs; err != nil {
-		return err
+		return errors.Wrap(err, "scale up")
 	}
 
 	return nil
 }
 
 type workflowJobEvent struct {
-	Action      runnerscaling.Status `json:"action"`
-	WorkflowJob queue.WorkflowJob    `json:"workflow_job"`
+	Action      string      `json:"action"`
+	WorkflowJob workflowJob `json:"workflow_job"`
 }
 
-func (s *server) handleWebhookEvent(w http.ResponseWriter, r *http.Request) {
-	// TO-DO: Add better request logging
-	log.Printf("Handling request: %s %s\n", r.Method, r.URL.String())
-	ctx := context.Background()
-
-	var e workflowJobEvent
-	err := json.NewDecoder(r.Body).Decode(&e)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Receive workflow job: '%+v'\n", e)
-	if e.Action == runnerscaling.StatusQueued {
-		msg, err := s.q.SendJob(ctx, &e.WorkflowJob)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		log.Printf("Successfully sent workflow job %d in message %s\n", e.WorkflowJob.Id, *msg.MessageId)
-	}
-
-	log.Println("Finish handling request")
+type workflowJob struct {
+	Id         int      `json:"id"`
+	Name       string   `json:"name"`
+	Url        string   `json:"url"`
+	StartedAt  string   `json:"started_at"`
+	Labels     []string `json:"labels"`
+	Conclusion string   `json:"conclusion"`
+	RunnerId   int      `json:"runner_id"`
+	RunnerName string   `json:"runner_name"`
 }
